@@ -3,6 +3,7 @@
 # to platform specific lists below.
 set(core_files
   builtins.h
+  clang_reflection.hpp
   endian.h
   float.h
   __float_float.h

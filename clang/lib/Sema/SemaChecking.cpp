@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CheckExprLifetime.h"
+#include "PublicFieldReflection.h"
 #include "clang/AST/APValue.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTDiagnostic.h"
@@ -3734,6 +3735,10 @@ Sema::CheckBuiltinFunctionCall(FunctionDecl *FDecl, unsigned BuiltinID,
   }
   case Builtin::BI__builtin_dump_struct:
     return BuiltinDumpStruct(*this, TheCall);
+  case Builtin::BI__builtin_public_field_name:
+  case Builtin::BI__builtin_public_field_is_bitfield:
+  case Builtin::BI__builtin_public_field_ref:
+    return public_field_reflection::checkBuiltinCall(*this, BuiltinID, TheCall);
   case Builtin::BI__builtin_expect_with_probability: {
     // We first want to ensure we are called with 3 arguments
     if (checkArgCount(TheCall, 3))

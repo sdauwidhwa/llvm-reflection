@@ -56,6 +56,11 @@ def __builtin_common_type : CPlusPlusBuiltinTemplate<
    Class<"HasNoTypeMember">,
    Class<"Ts", /*is_variadic=*/1>]>;
 
+// template <class T, size_t I>
+// The declared type of the I-th field counted by __builtin_public_field_count.
+def __builtin_public_field_type : CPlusPlusBuiltinTemplate<
+  [Class<"T">, SizeT]>;
+
 // template <uint32_t Opcode,
 //           uint32_t Size,
 //           uint32_t Alignment,

@@ -5015,6 +5015,26 @@ def BuiltinDumpStruct : Builtin {
   let Prototype = "void(...)";
 }
 
+// Public field reflection, used by <clang_reflection.hpp>. Sema replaces each
+// call with a string literal, a bool literal, or a member access expression.
+def BuiltinPublicFieldName : LangBuiltin<"CXX_LANG"> {
+  let Spellings = ["__builtin_public_field_name"];
+  let Attributes = [NoThrow, CustomTypeChecking, Constexpr];
+  let Prototype = "void(...)";
+}
+
+def BuiltinPublicFieldIsBitfield : LangBuiltin<"CXX_LANG"> {
+  let Spellings = ["__builtin_public_field_is_bitfield"];
+  let Attributes = [NoThrow, CustomTypeChecking, Constexpr];
+  let Prototype = "void(...)";
+}
+
+def BuiltinPublicFieldRef : LangBuiltin<"CXX_LANG"> {
+  let Spellings = ["__builtin_public_field_ref"];
+  let Attributes = [NoThrow, CustomTypeChecking, Constexpr];
+  let Prototype = "void(...)";
+}
+
 def BuiltinPreserveAccessIndex : Builtin {
   let Spellings = ["__builtin_preserve_access_index"];
   let Attributes = [CustomTypeChecking];

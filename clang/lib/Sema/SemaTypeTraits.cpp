@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "PublicFieldReflection.h"
 #include "clang/AST/ComparisonCategories.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/Mangle.h"
@@ -390,6 +391,11 @@ static bool CheckUnaryTypeTraitTypeCompleteness(Sema &S, TypeTrait UTT,
     // We diagnose incomplete class types later.
   case UTT_StructuredBindingSize:
     return true;
+
+  case UTT_PublicFieldCount:
+    return ArgTy->isDependentType() ||
+           public_field_reflection::checkRecordType(
+               S, ArgTy, Loc, "__builtin_public_field_count");
 
     // C++14 [meta.unary.prop]:
     //   If T is a non-union class type, T shall be a complete type.
@@ -1249,6 +1255,12 @@ static APValue EvaluateSizeTTypeTrait(Sema &S, TypeTrait Kind,
     return APValue();
 
   switch (Kind) {
+  case TypeTrait::UTT_PublicFieldCount: {
+    const CXXRecordDecl *RD =
+        Args[0]->getType()->getAsCXXRecordDecl()->getDefinition();
+    unsigned Count = public_field_reflection::countFields(RD);
+    return APValue(S.Context.MakeIntValue(Count, S.Context.getSizeType()));
+  }
   case TypeTrait::UTT_StructuredBindingSize: {
     QualType T = Args[0]->getType();
     SourceRange ArgRange = Args[0]->getTypeLoc().getSourceRange();
@@ -1518,7 +1530,8 @@ enum class TypeTraitReturnType {
 };
 
 static TypeTraitReturnType GetReturnType(TypeTrait Kind) {
-  if (Kind == TypeTrait::UTT_StructuredBindingSize)
+  if (Kind == TypeTrait::UTT_StructuredBindingSize ||
+      Kind == TypeTrait::UTT_PublicFieldCount)
     return TypeTraitReturnType::SizeT;
   if (Kind == TypeTrait::BTT_TypeOrder)
     return TypeTraitReturnType::StrongOrdering;

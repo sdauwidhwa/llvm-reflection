@@ -702,6 +702,12 @@ def note_in_binding_decl_init : Note<
   "in implicit initialization of binding declaration %0">;
 def err_arg_is_not_destructurable : Error<
   "type %0 cannot be bound">;
+def err_public_field_reflection_type : Error<
+  "'%0' requires a complete struct or class type, got %1">;
+def err_public_field_reflection_pointer : Error<
+  "first argument to '%0' must be a pointer to a struct or class type, got %1">;
+def err_public_field_index_out_of_range : Error<
+  "index %0 is out of range for %1, which has %2 public field%s2">;
 
 def err_std_type_trait_not_class_template : Error<
   "unsupported standard library implementation: "

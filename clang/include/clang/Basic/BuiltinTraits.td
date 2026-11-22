@@ -474,6 +474,10 @@ def StructuredBindingSize : UnaryTrait {
   let Spelling = "__builtin_structured_binding_size";
 }
 
+def PublicFieldCount : UnaryTrait {
+  let Spelling = "__builtin_public_field_count";
+}
+
 // Embarcadero Expression Traits
 def IsLValueExpr : ExpressionTrait {
   let Spelling = "__is_lvalue_expr";

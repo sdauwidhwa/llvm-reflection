@@ -379,3 +379,9 @@ module _Builtin_meta [system] {
   header "meta"
   export *
 }
+
+module _Builtin_clang_reflection [system] {
+  requires cplusplus17
+  header "clang_reflection.hpp"
+  export *
+}

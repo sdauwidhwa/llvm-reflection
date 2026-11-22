@@ -2185,6 +2185,60 @@ static_assert(__builtin_structured_binding_size(S) == 2);
 static_assert(get_binding<1>(S{}) == 42);
 ```
 
+### Public field reflection (C++)
+
+In this fork, a set of builtins describes the public data members of a
+complete struct or class `T`, including cv-qualified types. They all see the
+same members: the named public non-static data members declared directly in
+`T`, in declaration order. Base-class members, unnamed bit-fields, and the
+members of anonymous structs and unions are excluded, as are lambda captures,
+which have no names. Index `I` names the same member in every builtin, and
+every index below the count is valid.
+
+| Builtin | Result |
+|---|---|
+| `__builtin_public_field_count(T)` | the number of members, as a `size_t` constant |
+| `__builtin_public_field_type<T, I>` | the declared type of member `I`, e.g. `int &` for a reference member |
+| `__builtin_public_field_name(T *p, I)` | the name of member `I` as a string literal; `p` only names the class and is not evaluated |
+| `__builtin_public_field_is_bitfield(T *p, I)` | whether member `I` is a bit-field, as a `bool` constant |
+| `__builtin_public_field_ref(object, I)` | the member access `object.member`, usable wherever that expression is, including in constant expressions and to assign a bit-field |
+
+`I` must be an integral constant expression. Inside a template it can be a
+template parameter, such as one element of an `index_sequence` pack: the
+builtin is checked when the template is instantiated. An index out of range is
+an error, and in `__builtin_public_field_type` a substitution failure.
+
+In C++17 and later, `<clang_reflection.hpp>` wraps the builtins:
+
+```c++
+#include <clang_reflection.hpp>
+#include <utility>
+
+struct point { int x; long y; };
+using info = reflection<point>;
+
+static_assert(info::variable_count == 2);
+static_assert(__is_same(info::variable_type<1>, long));
+static_assert(info::variable_name<0>[0] == 'x');
+static_assert(!info::is_bit_field<0>);
+
+template <class T, std::size_t... Is>
+constexpr long sum(const T &object, std::index_sequence<Is...>) {
+  return (0 + ... + reflection<T>::template get<Is>(object));
+}
+static_assert(sum(point{1, 2},
+                  std::make_index_sequence<info::variable_count>{}) == 3);
+```
+
+`reflection<T>::get<I>(object)` returns member `I` with the reference type
+`std::get` would give a tuple element: `T &` for an lvalue, `T &&` for an
+rvalue, const-qualified for a const object unless the member is `mutable`. A
+bit-field cannot be bound to a reference, so `get` returns it by value. Use
+`__builtin_public_field_ref(object, I) = value` to assign one.
+
+Define the reflected type before querying it. The same definition can be
+included from a shared header in multiple translation units.
+
 ## Blocks
 
 The syntax and high-level language feature description is in

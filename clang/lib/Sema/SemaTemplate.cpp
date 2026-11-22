@@ -8,6 +8,7 @@
 //  This file implements semantic analysis for C++ templates.
 //===----------------------------------------------------------------------===//
 
+#include "PublicFieldReflection.h"
 #include "TreeTransform.h"
 #include "clang/AST/ASTConcept.h"
 #include "clang/AST/ASTConsumer.h"
@@ -3558,6 +3559,26 @@ static QualType checkBuiltinTemplateIdType(
     }
     QualType HasNoTypeMember = Converted[2].getAsType();
     return HasNoTypeMember;
+  }
+
+  case BTK__builtin_public_field_type: {
+    // __builtin_public_field_type<T, I> is the declared type of the I-th
+    // field that __builtin_public_field_count(T) counts.
+    assert(Converted.size() == 2);
+    QualType RecordTy = Converted[0].getAsType();
+    TemplateArgument IndexArg = Converted[1];
+    if (RecordTy->isDependentType() || IndexArg.isDependent())
+      return QualType();
+
+    const CXXRecordDecl *RD = public_field_reflection::checkRecordType(
+        SemaRef, RecordTy, TemplateArgs[0].getLocation(), BTD->getName());
+    if (!RD)
+      return QualType();
+    const FieldDecl *FD = public_field_reflection::getField(
+        SemaRef, RD, IndexArg.getAsIntegral(), TemplateArgs[1].getLocation());
+    if (!FD)
+      return QualType();
+    return FD->getType();
   }
 
   case BTK__hlsl_spirv_type: {

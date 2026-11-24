@@ -2228,13 +2228,29 @@ constexpr long sum(const T &object, std::index_sequence<Is...>) {
 }
 static_assert(sum(point{1, 2},
                   std::make_index_sequence<info::variable_count>{}) == 3);
+
+constexpr point updated() {
+  point p{1, 2};
+  info::ref<0>(p) += 10; // p.x is 11
+  info::set<1>(p, 5);    // p.y is 5
+  return p;
+}
+static_assert(updated().x == 11 && updated().y == 5);
 ```
 
-`reflection<T>::get<I>(object)` returns member `I` with the reference type
-`std::get` would give a tuple element: `T &` for an lvalue, `T &&` for an
-rvalue, const-qualified for a const object unless the member is `mutable`. A
-bit-field cannot be bound to a reference, so `get` returns it by value. Use
-`__builtin_public_field_ref(object, I) = value` to assign one.
+Members are accessed in three ways:
+
+| Accessor | Result |
+|---|---|
+| `reflection<T>::ref<I>(object)` | a reference to member `I`, with the type `std::get` would give a tuple element: `T &` for an lvalue, `T &&` for an rvalue, const-qualified for a const object unless the member is `mutable` |
+| `reflection<T>::get<I>(object)` | a copy of member `I` without const or reference, moved out when `object` is an rvalue |
+| `reflection<T>::set<I>(object, value)` | `object.member = value` |
+
+A bit-field cannot be bound to a reference, so `ref` does not exist for one:
+calling it is an overload resolution failure, which generic code can also
+detect. Use `get` and `set` for a bit-field, and `is_bit_field<I>` to choose
+between `ref` and `get` in generic code. An array cannot be returned or
+assigned by value, so use `ref` for an array member.
 
 Define the reflected type before querying it. The same definition can be
 included from a shared header in multiple translation units.

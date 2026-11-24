@@ -69,39 +69,92 @@ static_assert(!R::is_bit_field<0> && !R::is_bit_field<2> && R::is_bit_field<3>);
 // Reading members in constant expressions.
 int global = 42;
 constexpr Mixed constant(global);
+static_assert(R::ref<0>(constant) == 2);
+static_assert(&R::ref<2>(constant) == &global);
 static_assert(R::get<0>(constant) == 2);
 static_assert(equal(R::get<1>(constant), "two"));
-static_assert(&R::get<2>(constant) == &global);
 static_assert(R::get<3>(constant) == 5);
 
-// get<I> follows std::get: the value category and constness of the object
+// ref<I> follows std::get: the value category and constness of the object
 // carry over, a reference member is always an lvalue, and 'mutable' drops
-// const. A bit-field comes back by value.
+// const.
 Mixed &lvalue();
 const Mixed &const_lvalue();
 Mixed &&xvalue();
-static_assert(same<decltype(R::get<0>(lvalue())), int &>);
-static_assert(same<decltype(R::get<0>(const_lvalue())), const int &>);
-static_assert(same<decltype(R::get<0>(xvalue())), int &&>);
-static_assert(same<decltype(R::get<2>(xvalue())), int &>);
+static_assert(same<decltype(R::ref<0>(lvalue())), int &>);
+static_assert(same<decltype(R::ref<0>(const_lvalue())), const int &>);
+static_assert(same<decltype(R::ref<0>(xvalue())), int &&>);
+static_assert(same<decltype(R::ref<2>(xvalue())), int &>);
+static_assert(same<decltype(R::ref<4>(const_lvalue())), long &>);
+
+// A bit-field has no ref.
+template <size_t I, class = void> constexpr bool has_ref = false;
+template <size_t I>
+constexpr bool has_ref<I, decltype((void)R::ref<I>(lvalue()))> = true;
+static_assert(has_ref<0> && has_ref<1> && has_ref<2> && !has_ref<3> &&
+              has_ref<4>);
+
+// get<I> returns a copy without const or reference, bit-fields included.
+static_assert(same<decltype(R::get<0>(const_lvalue())), int>);
+static_assert(same<decltype(R::get<1>(xvalue())), const char *>);
+static_assert(same<decltype(R::get<2>(lvalue())), int>);
 static_assert(same<decltype(R::get<3>(lvalue())), unsigned>);
-static_assert(same<decltype(R::get<4>(const_lvalue())), long &>);
+static_assert(same<decltype(R::get<4>(const_lvalue())), long>);
+
+struct ConstMember { const int value; };
+static_assert(same<decltype(reflection<ConstMember>::get<0>(ConstMember{1})),
+                   int>);
+
+// get<I> moves the member out of an rvalue.
+struct MoveOnly {
+  constexpr MoveOnly(int v) : v(v) {}
+  MoveOnly(const MoveOnly &) = delete;
+  constexpr MoveOnly(MoveOnly &&) = default;
+  constexpr MoveOnly &operator=(MoveOnly &&) = default;
+  int v;
+};
+struct Holder { MoveOnly item; };
+static_assert(reflection<Holder>::get<0>(Holder{MoveOnly(8)}).v == 8);
+
+// An array member is reached through ref.
+struct WithArray { int values[2]; };
+constexpr WithArray with_array{{3, 4}};
+static_assert(same<decltype(reflection<WithArray>::ref<0>(with_array)),
+                   const int (&)[2]>);
+static_assert(reflection<WithArray>::ref<0>(with_array)[1] == 4);
 
 // The builtin itself is a member access expression, including for decltype.
 static_assert(same<decltype(__builtin_public_field_ref(lvalue(), 0)), int>);
 static_assert(same<decltype((__builtin_public_field_ref(lvalue(), 0))), int &>);
 static_assert(same<decltype((__builtin_public_field_ref(Mixed(global), 0))), int &&>);
 
-// Writing members, including a bit-field through the builtin.
+// Writing members through ref and set. set reaches a bit-field, keeping its
+// width, and assigns through a reference member.
 constexpr int write_members() {
   int target = 0;
   Mixed m(target);
-  R::get<0>(m) = 10;
-  R::get<2>(m) = 20;
-  __builtin_public_field_ref(m, 3) = 6;
+  R::ref<0>(m) = 10;
+  R::set<2>(m, 20);
+  R::set<3>(m, 6);
+  __builtin_public_field_ref(m, 3) += 1;
   return R::get<0>(m) + target + R::get<3>(m);
 }
-static_assert(write_members() == 36);
+static_assert(write_members() == 37);
+
+constexpr unsigned truncated_bit_field() {
+  int target = 0;
+  Mixed m(target);
+  R::set<3>(m, 9u); // 0b1001 in a 3-bit field
+  return R::get<3>(m);
+}
+static_assert(truncated_bit_field() == 1);
+
+constexpr int set_moves() {
+  Holder h{MoveOnly(1)};
+  reflection<Holder>::set<0>(h, MoveOnly(5));
+  return h.item.v;
+}
+static_assert(set_moves() == 5);
 
 // Indices unpacked from an integer sequence.
 template <class T, T... Is> struct sequence {};
@@ -197,3 +250,12 @@ int from_empty = first_member(Empty{}); // expected-note {{in instantiation of f
 struct Other { int x; };
 int wrong_object = R::get<0>(Other{1}); // expected-note {{in instantiation of function template specialization 'reflection<Mixed>::get<0}}
 // expected-error@clang_reflection.hpp:* {{reflection<T>::get requires an object of type T}}
+int wrong_ref_object = R::ref<0>(Other{1}); // expected-note {{in instantiation of function template specialization 'reflection<Mixed>::ref<0}}
+// expected-error@clang_reflection.hpp:* {{reflection<T>::ref requires an object of type T}}
+
+void accessor_errors(Mixed &m, WithArray &a) {
+  (void)R::ref<3>(m); // expected-error {{no matching function for call to 'ref'}}
+  // expected-note@clang_reflection.hpp:* {{candidate template ignored: requirement '!is_bit_field<3}}
+  (void)reflection<WithArray>::get<0>(a); // expected-note {{in instantiation of function template specialization 'reflection<WithArray>::get<0}}
+  // expected-error@clang_reflection.hpp:* {{reflection<T>::get cannot copy an array member; use ref}}
+}

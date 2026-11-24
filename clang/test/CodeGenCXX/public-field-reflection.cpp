@@ -25,9 +25,26 @@ extern "C" void set_d(S &s, unsigned v) { __builtin_public_field_ref(s, 3) = v; 
 // CHECK: ret ptr @[[NAME]]
 extern "C" const char *name_b() { return reflection<S>::variable_name<1>; }
 
-// CHECK-LABEL: define {{.*}}i32 @via_get(
-// CHECK: call {{.*}}ptr @[[GET:_ZN10reflectionI1SE3getILm1ERKS0_EEDcOT0_]](
-// CHECK: define linkonce_odr {{.*}}ptr @[[GET]](
+// CHECK-LABEL: define {{.*}}ptr @via_ref(
+// CHECK: call {{.*}}ptr @[[REF:_ZN10reflectionI1SE3refILm1E[^(]+]](
+// CHECK: define linkonce_odr {{.*}}ptr @[[REF]](
 // CHECK: %[[B:.+]] = getelementptr inbounds nuw %struct.S, ptr %{{.+}}, i32 0, i32 1
 // CHECK: ret ptr %[[B]]
-extern "C" int via_get(const S &s) { return reflection<S>::get<1>(s); }
+extern "C" const int *via_ref(const S &s) { return &reflection<S>::ref<1>(s); }
+
+// CHECK-LABEL: define {{.*}}i32 @via_get(
+// CHECK: call {{.*}}i32 @[[GET:_ZN10reflectionI1SE3getILm3ERKS0_EEDaOT0_]](
+// CHECK: define linkonce_odr {{.*}}i32 @[[GET]](
+// CHECK: getelementptr inbounds nuw %struct.S, ptr %{{.+}}, i32 0, i32 3
+// CHECK: %[[D:.+]] = and i8 %{{.+}}, 31
+// CHECK: %[[EXT:.+]] = zext i8 %[[D]] to i32
+// CHECK: ret i32 %[[EXT]]
+extern "C" unsigned via_get(const S &s) { return reflection<S>::get<3>(s); }
+
+// CHECK-LABEL: define {{.*}}void @via_set(
+// CHECK: call void @[[SET:_ZN10reflectionI1SE3setILm3ERjEEvRS0_OT0_]](
+// CHECK: define linkonce_odr void @[[SET]](
+// CHECK: getelementptr inbounds nuw %struct.S, ptr %{{.+}}, i32 0, i32 3
+// CHECK: and i8 %{{.+}}, 31
+// CHECK: and i8 %{{.+}}, -32
+extern "C" void via_set(S &s, unsigned v) { reflection<S>::set<3>(s, v); }
